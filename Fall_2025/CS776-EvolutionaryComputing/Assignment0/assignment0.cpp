@@ -53,16 +53,63 @@ std::vector<double> generate_random_vector(int num_dimensions, std::pair<double,
 }
 
 
+
+// Basic hill climber
+std::vector<double> hill_climb(std::vector<double> current, double step_size = .1, int max_iterations = 1000) {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::normal_distribution<double> dist(0.0, step_size);
+
+    std::vector<double> fitness_history;
+    fitness_history.reserve(max_iterations);
+
+    double current_fitness = sphere(current);
+
+    for (int i = 0; i < max_iterations; ++i) {
+        // Store current fitness for current iteration
+        fitness_history.push_back(current_fitness);
+        
+        // Generate neighbor by adding small random changes
+        std::vector<double> neighbor = current;
+        for (size_t j = 0; j < neighbor.size(); ++j) {
+            neighbor[j] += dist(gen);
+            neighbor[j] = std::max(-5.12, std::min(5.12, neighbor[j]));
+        }
+
+        double neighbor_fitness = sphere(neighbor);
+        
+        // Move to neighbor if the fitness is better
+        if (neighbor_fitness < current_fitness) {
+            current = neighbor;
+            current_fitness = neighbor_fitness;
+        }
+        
+        //std::cout << fitness_history[i] - fitness_history[i-10];
+
+        // If fitness has not improved, return
+        if (i >= 10 && (fitness_history[i-10] - fitness_history[i] < .001)){
+            return fitness_history;
+        }
+    }
+    return fitness_history;
+}
+
 int main() {
     // Example vector for testing
     std::vector<double> test_vec = generate_random_vector(5, {-5.12, 5.12});
-    double result = sphere(test_vec);
     std::cout << "Initial Candidate: [";
     for (size_t i = 0; i < test_vec.size(); ++i) {
         std::cout << test_vec[i];
         if (i != test_vec.size() - 1) std::cout << ", ";
     }
-    std::cout << "] | " << result << std::endl;
+    // Start hill climber
+    std::vector<double> fitness_history = hill_climb(test_vec);
+
+    // Example: Print fitness every 100 iterations to see progress
+    std::cout << "\nFitness progress:" << std::endl;
+    for (size_t i = 0; i < fitness_history.size(); i += 100) {
+        std::cout << "Iteration " << i << ": " << fitness_history[i] << std::endl;
+    }
 
     return 0;
 }
