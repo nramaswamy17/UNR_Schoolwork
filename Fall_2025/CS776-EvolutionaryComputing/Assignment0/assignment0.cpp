@@ -52,10 +52,23 @@ std::vector<double> generate_random_vector(int num_dimensions, std::pair<double,
     return vec;
 }
 
+double get_fitness(const std::vector<double>& candidate, const std::string& function_name) {
+    // Make a copy because the De Jong functions expect non-const reference
+    std::vector<double> candidate_copy = candidate;
+    if (function_name == "sphere") {
+        return sphere(candidate_copy);
+    } else if (function_name == "rosenbrock") {
+        return rosenbrock(candidate_copy);
+    } else if (function_name == "step") {
+        return step(candidate_copy);
+    } else {
+        throw std::invalid_argument("Unknown function name: " + function_name);
+    }
+}
 
 
 // Basic hill climber
-std::vector<double> hill_climb(std::vector<double> current, double step_size = .1, int max_iterations = 1000) {
+std::pair<std::vector<double>, std::vector<double>> hill_climb(std::vector<double> current, const std::string& function_name, double step_size = .1, int max_iterations = 1000) {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::normal_distribution<double> dist(0.0, step_size);
@@ -63,7 +76,7 @@ std::vector<double> hill_climb(std::vector<double> current, double step_size = .
     std::vector<double> fitness_history;
     fitness_history.reserve(max_iterations);
 
-    double current_fitness = sphere(current);
+    double current_fitness = get_fitness(current, function_name);
 
     for (int i = 0; i < max_iterations; ++i) {
         // Store current fitness for current iteration
@@ -88,28 +101,93 @@ std::vector<double> hill_climb(std::vector<double> current, double step_size = .
 
         // If fitness has not improved, return
         if (i >= 10 && (fitness_history[i-10] - fitness_history[i] < .001)){
-            return fitness_history;
+            return std::make_pair(fitness_history, current);
         }
     }
-    return fitness_history;
+    return std::make_pair(fitness_history, current);
 }
 
 int main() {
-    // Example vector for testing
-    std::vector<double> test_vec = generate_random_vector(5, {-5.12, 5.12});
-    std::cout << "Initial Candidate: [";
-    for (size_t i = 0; i < test_vec.size(); ++i) {
-        std::cout << test_vec[i];
-        if (i != test_vec.size() - 1) std::cout << ", ";
-    }
-    // Start hill climber
-    std::vector<double> fitness_history = hill_climb(test_vec);
 
-    // Example: Print fitness every 100 iterations to see progress
+    int n; 
+    double range;
+    std::vector<double> initial_candidate;
+    std::vector<double> fitness_history;
+    std::vector<double> final_candidate;
+
+    // Helper lambda to print a vector
+    auto print_vector = [](const std::vector<double>& vec) {
+        std::cout << "[";
+        for (size_t i = 0; i < vec.size(); ++i) {
+            std::cout << vec[i];
+            if (i != vec.size() - 1) std::cout << ", ";
+        }
+        std::cout << "]";
+    };
+    
+    // Sphere testing
+    std::cout << "\nSPHERE FUNCTION:" << std::endl;
+    n = 3;
+    range = 5.12;
+    initial_candidate = generate_random_vector(n, {-range, range});
+    std::cout << "Initial Candidate (Sphere): ";
+    print_vector(initial_candidate);
+    std::cout << std::endl;
+    auto result = hill_climb(initial_candidate, "sphere"); // Start hill climber
+    fitness_history = result.first;
+    final_candidate = result.second;
+
+    // Print fitness every 100 iterations to see progress
     std::cout << "\nFitness progress:" << std::endl;
     for (size_t i = 0; i < fitness_history.size(); i += 100) {
         std::cout << "Iteration " << i << ": " << fitness_history[i] << std::endl;
     }
+    std::cout << "Final Candidate (Sphere): ";
+    print_vector(final_candidate);
+    std::cout << std::endl;
 
+    
+    // Rosenbrock testing
+    std::cout << "\nROSENBROCK FUNCTION:" << std::endl;
+    n = 2;
+    range = 2.048;
+    initial_candidate = generate_random_vector(n, {-range, range});
+    std::cout << "Initial Candidate (Rosenbrock): ";
+    print_vector(initial_candidate);
+    std::cout << std::endl;
+    result = hill_climb(initial_candidate, "rosenbrock"); // Start hill climber
+    fitness_history = result.first;
+    final_candidate = result.second;
+
+    // Print fitness every 100 iterations to see progress
+    std::cout << "\nFitness progress:" << std::endl;
+    for (size_t i = 0; i < fitness_history.size(); i += 10) {
+        std::cout << "Iteration " << i << ": " << fitness_history[i] << std::endl;
+    }
+    std::cout << "Final Candidate (Rosenbrock): ";
+    print_vector(final_candidate);
+    std::cout << std::endl;
+    
+    // Step testing
+    std::cout << "\nSTEP FUNCTION:" << std::endl;
+    n = 5;
+    range = 5.12;
+    initial_candidate = generate_random_vector(n, {-range, range});
+    std::cout << "Initial Candidate (Step): ";
+    print_vector(initial_candidate);
+    std::cout << std::endl;
+    result = hill_climb(initial_candidate, "step"); // Start hill climber
+    fitness_history = result.first;
+    final_candidate = result.second;
+
+    // Print fitness every 100 iterations to see progress
+    std::cout << "\nFitness progress:" << std::endl;
+    for (size_t i = 0; i < fitness_history.size(); i += 10) {
+        std::cout << "Iteration " << i << ": " << fitness_history[i] << std::endl;
+    }
+    std::cout << "Final Candidate (Step): ";
+    print_vector(final_candidate);
+    std::cout << std::endl;
+    
     return 0;
 }
