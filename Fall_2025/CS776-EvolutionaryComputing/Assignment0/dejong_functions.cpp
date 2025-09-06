@@ -1,6 +1,7 @@
 #include "dejong_functions.h"
 #include <iostream>
 #include <stdexcept>
+#include <cmath>
 
 // Function implementation
 double sphere(std::vector<double>& vec){
