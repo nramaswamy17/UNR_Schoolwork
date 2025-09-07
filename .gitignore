@@ -18,3 +18,5 @@
 *.7z
 *.tmp
 build/
+*.csv
+*.venv

@@ -24,6 +24,7 @@ Print the results to test that everything works
 #include <iostream>
 #include <vector>
 #include <stdexcept>
+#include <fstream>
 #include "dejong_functions.h"
 
 #include <random>
@@ -100,11 +101,29 @@ std::pair<std::vector<double>, std::vector<double>> hill_climb(std::vector<doubl
         //std::cout << fitness_history[i] - fitness_history[i-10];
 
         // If fitness has not improved, return
+        /*
         if (i >= 10 && (fitness_history[i-10] - fitness_history[i] < .001)){
             return std::make_pair(fitness_history, current);
-        }
+        }*/
     }
     return std::make_pair(fitness_history, current);
+}
+
+
+void exportFitnessToCSV(const std::vector<double>& fitness_history, const std::string& filename = "fitness_data.csv") {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Error: Could not open file " << filename << " for writing.\n";
+        return;
+    }
+    
+    file << "Iteration,Fitness\n";  // CSV header
+    for (size_t i = 0; i < fitness_history.size(); ++i) {
+        file << i+1 << "," << fitness_history[i] << "\n";
+    }
+    
+    file.close();
+    std::cout << "Fitness data exported to " << filename << "\n";
 }
 
 int main() {
@@ -129,65 +148,76 @@ int main() {
     std::cout << "\nSPHERE FUNCTION:" << std::endl;
     n = 3;
     range = 5.12;
-    initial_candidate = generate_random_vector(n, {-range, range});
-    std::cout << "Initial Candidate (Sphere): ";
-    print_vector(initial_candidate);
-    std::cout << std::endl;
-    auto result = hill_climb(initial_candidate, "sphere"); // Start hill climber
-    fitness_history = result.first;
-    final_candidate = result.second;
-
-    // Print fitness every 100 iterations to see progress
-    std::cout << "\nFitness progress:" << std::endl;
-    for (size_t i = 0; i < fitness_history.size(); i += 100) {
-        std::cout << "Iteration " << i << ": " << fitness_history[i] << std::endl;
-    }
-    std::cout << "Final Candidate (Sphere): ";
-    print_vector(final_candidate);
-    std::cout << std::endl;
-
     
+    std::cout << "Run # | Initial Candidate | Final Candidate:" << std::endl;
+    for (int run = 0; run < 30; run++){
+        initial_candidate = generate_random_vector(n, {-range, range});
+        
+        auto result = hill_climb(initial_candidate, "sphere"); // Start hill climber
+        fitness_history = result.first;
+        final_candidate = result.second;
+
+        std::cout << run;
+        std::cout << " | ";
+        print_vector(initial_candidate);
+        std::cout << "\t-> ";
+        print_vector(final_candidate);
+        std::cout << std::endl;
+
+        // Export fitness history to CSV, including the run number in the CSV
+        std::string csv_filename = "data/sphere_data_run" + std::to_string(run) + ".csv";
+        exportFitnessToCSV(fitness_history, csv_filename);
+    }
+    
+
     // Rosenbrock testing
     std::cout << "\nROSENBROCK FUNCTION:" << std::endl;
     n = 2;
     range = 2.048;
-    initial_candidate = generate_random_vector(n, {-range, range});
-    std::cout << "Initial Candidate (Rosenbrock): ";
-    print_vector(initial_candidate);
-    std::cout << std::endl;
-    result = hill_climb(initial_candidate, "rosenbrock"); // Start hill climber
-    fitness_history = result.first;
-    final_candidate = result.second;
 
-    // Print fitness every 100 iterations to see progress
-    std::cout << "\nFitness progress:" << std::endl;
-    for (size_t i = 0; i < fitness_history.size(); i += 10) {
-        std::cout << "Iteration " << i << ": " << fitness_history[i] << std::endl;
+    std::cout << "Run # | Initial Candidate | Final Candidate:" << std::endl;
+    for (int run = 0; run < 30; run++) {
+        initial_candidate = generate_random_vector(n, {-range, range});
+
+        auto result = hill_climb(initial_candidate, "rosenbrock"); // Start hill climber
+        fitness_history = result.first;
+        final_candidate = result.second;
+
+        std::cout << run;
+        std::cout << " | ";
+        print_vector(initial_candidate);
+        std::cout << "\t-> ";
+        print_vector(final_candidate);
+        std::cout << std::endl;
+
+        // Export fitness history to CSV, including the run number in the CSV
+        std::string csv_filename = "data/rosenbrock_data_run" + std::to_string(run) + ".csv";
+        exportFitnessToCSV(fitness_history, csv_filename);
     }
-    std::cout << "Final Candidate (Rosenbrock): ";
-    print_vector(final_candidate);
-    std::cout << std::endl;
-    
+
     // Step testing
     std::cout << "\nSTEP FUNCTION:" << std::endl;
     n = 5;
     range = 5.12;
-    initial_candidate = generate_random_vector(n, {-range, range});
-    std::cout << "Initial Candidate (Step): ";
-    print_vector(initial_candidate);
-    std::cout << std::endl;
-    result = hill_climb(initial_candidate, "step"); // Start hill climber
-    fitness_history = result.first;
-    final_candidate = result.second;
 
-    // Print fitness every 100 iterations to see progress
-    std::cout << "\nFitness progress:" << std::endl;
-    for (size_t i = 0; i < fitness_history.size(); i += 10) {
-        std::cout << "Iteration " << i << ": " << fitness_history[i] << std::endl;
+    std::cout << "Run # | Initial Candidate | Final Candidate:" << std::endl;
+    for (int run = 0; run < 30; run++) {
+        initial_candidate = generate_random_vector(n, {-range, range});
+
+        auto result = hill_climb(initial_candidate, "step"); // Start hill climber
+        fitness_history = result.first;
+        final_candidate = result.second;
+
+        std::cout << run;
+        std::cout << " | ";
+        print_vector(initial_candidate);
+        std::cout << "\t-> ";
+        print_vector(final_candidate);
+        std::cout << std::endl;
+
+        // Export fitness history to CSV, including the run number in the CSV
+        std::string csv_filename = "data/step_data_run" + std::to_string(run) + ".csv";
+        exportFitnessToCSV(fitness_history, csv_filename);
     }
-    std::cout << "Final Candidate (Step): ";
-    print_vector(final_candidate);
-    std::cout << std::endl;
-    
     return 0;
 }
