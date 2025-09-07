@@ -3,6 +3,7 @@ CXXFLAGS = -std=c++20 -Wall -Wextra
 
 # Main program
 assignment0: assignment0.cpp dejong_functions.cpp
+	rm -rf data/*
 	$(CXX) $(CXXFLAGS) -o build/assignment0 assignment0.cpp dejong_functions.cpp
 	./build/assignment0
 

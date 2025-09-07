@@ -69,10 +69,15 @@ double get_fitness(const std::vector<double>& candidate, const std::string& func
 
 
 // Basic hill climber
-std::pair<std::vector<double>, std::vector<double>> hill_climb(std::vector<double> current, const std::string& function_name, double step_size = .1, int max_iterations = 1000) {
+std::pair<std::vector<double>, std::vector<double>> hill_climb(
+    std::vector<double> current,
+    const std::string& function_name,
+    double step_size = .1,
+    int max_iterations = 1000,
+    std::pair<double, double> bounds = {-5.12, 5.12}
+) {
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::normal_distribution<double> dist(0.0, step_size);
 
     std::vector<double> fitness_history;
     fitness_history.reserve(max_iterations);
@@ -80,17 +85,22 @@ std::pair<std::vector<double>, std::vector<double>> hill_climb(std::vector<doubl
     double current_fitness = get_fitness(current, function_name);
 
     for (int i = 0; i < max_iterations; ++i) {
+
+        // step size multiplier
+
         // Store current fitness for current iteration
         fitness_history.push_back(current_fitness);
         
         // Generate neighbor by adding small random changes
         std::vector<double> neighbor = current;
         for (size_t j = 0; j < neighbor.size(); ++j) {
+            // Create a new normal distribution for each dimension to ensure proper randomization
+            std::normal_distribution<double> dist(0.0, step_size);
             neighbor[j] += dist(gen);
-            neighbor[j] = std::max(-5.12, std::min(5.12, neighbor[j]));
+            neighbor[j] = std::max(bounds.first, std::min(bounds.second, neighbor[j]));
         }
 
-        double neighbor_fitness = sphere(neighbor);
+        double neighbor_fitness = get_fitness(neighbor, function_name);
         
         // Move to neighbor if the fitness is better
         if (neighbor_fitness < current_fitness) {
@@ -110,20 +120,75 @@ std::pair<std::vector<double>, std::vector<double>> hill_climb(std::vector<doubl
 }
 
 
-void exportFitnessToCSV(const std::vector<double>& fitness_history, const std::string& filename = "fitness_data.csv") {
+void exportFitnessToCSV(const std::vector<double>& fitness_history, const std::vector<double>& final_vector, const std::string& filename = "fitness_data.csv") {
     std::ofstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Error: Could not open file " << filename << " for writing.\n";
         return;
     }
     
-    file << "Iteration,Fitness\n";  // CSV header
+    // Create header with vector dimensions
+    file << "Iteration,Fitness";
+    for (size_t i = 0; i < final_vector.size(); ++i) {
+        file << ",x" << i;
+    }
+    file << "\n";
+    
     for (size_t i = 0; i < fitness_history.size(); ++i) {
-        file << i+1 << "," << fitness_history[i] << "\n";
+        file << i+1 << "," << fitness_history[i];
+        for (size_t j = 0; j < final_vector.size(); ++j) {
+            file << "," << final_vector[j];
+        }
+        file << "\n";
     }
     
     file.close();
-    std::cout << "Fitness data exported to " << filename << "\n";
+    //std::cout << "Fitness data exported to " << filename << "\n";
+}
+
+// Reusable experiment runner
+void run_experiment(const std::string& label,
+                    const std::string& function_name,
+                    int dimensions,
+                    double range,
+                    const std::string& csv_prefix) {
+    std::cout << "\n" << label << ":" << std::endl;
+
+    // Helper lambda to print a vector
+    auto print_vector = [](const std::vector<double>& vec) {
+        std::cout << "[";
+        for (size_t i = 0; i < vec.size(); ++i) {
+            std::cout << vec[i];
+            if (i != vec.size() - 1) std::cout << ", ";
+        }
+        std::cout << "]";
+    };
+
+    std::cout << "Run # | Fitness | Initial Candidate | Final Candidate:" << std::endl;
+    for (int run = 0; run < 100; run++) {
+        std::vector<double> initial_candidate = generate_random_vector(dimensions, {-range, range});
+
+        // Determine bounds per function
+        std::pair<double, double> bounds = {-5.12, 5.12};
+        if (function_name == "rosenbrock") bounds = {-2.048, 2.048};
+
+        auto result = hill_climb(initial_candidate, function_name, .1, 1000, bounds); // Start hill climber
+        std::vector<double> fitness_history = result.first;
+        std::vector<double> final_candidate = result.second;
+
+        std::cout << run;
+        std::cout << " | ";
+        std::cout << fitness_history.back();
+        std::cout << " | ";
+        print_vector(initial_candidate);
+        std::cout << "\t-> ";
+        print_vector(final_candidate);
+        std::cout << std::endl;
+
+        // Export fitness history to CSV, including the run number in the CSV
+        std::string csv_filename = csv_prefix + std::to_string(run) + ".csv";
+        exportFitnessToCSV(fitness_history, final_candidate, csv_filename);
+    }
 }
 
 int main() {
@@ -144,80 +209,13 @@ int main() {
         std::cout << "]";
     };
     
-    // Sphere testing
-    std::cout << "\nSPHERE FUNCTION:" << std::endl;
-    n = 3;
-    range = 5.12;
-    
-    std::cout << "Run # | Initial Candidate | Final Candidate:" << std::endl;
-    for (int run = 0; run < 30; run++){
-        initial_candidate = generate_random_vector(n, {-range, range});
-        
-        auto result = hill_climb(initial_candidate, "sphere"); // Start hill climber
-        fitness_history = result.first;
-        final_candidate = result.second;
+    // Sphere
+    run_experiment("SPHERE FUNCTION", "sphere", 3, 5.12, "data/sphere_data_run");
 
-        std::cout << run;
-        std::cout << " | ";
-        print_vector(initial_candidate);
-        std::cout << "\t-> ";
-        print_vector(final_candidate);
-        std::cout << std::endl;
+    // Rosenbrock
+    run_experiment("ROSENBROCK FUNCTION", "rosenbrock", 2, 2.048, "data/rosenbrock_data_run");
 
-        // Export fitness history to CSV, including the run number in the CSV
-        std::string csv_filename = "data/sphere_data_run" + std::to_string(run) + ".csv";
-        exportFitnessToCSV(fitness_history, csv_filename);
-    }
-    
-
-    // Rosenbrock testing
-    std::cout << "\nROSENBROCK FUNCTION:" << std::endl;
-    n = 2;
-    range = 2.048;
-
-    std::cout << "Run # | Initial Candidate | Final Candidate:" << std::endl;
-    for (int run = 0; run < 30; run++) {
-        initial_candidate = generate_random_vector(n, {-range, range});
-
-        auto result = hill_climb(initial_candidate, "rosenbrock"); // Start hill climber
-        fitness_history = result.first;
-        final_candidate = result.second;
-
-        std::cout << run;
-        std::cout << " | ";
-        print_vector(initial_candidate);
-        std::cout << "\t-> ";
-        print_vector(final_candidate);
-        std::cout << std::endl;
-
-        // Export fitness history to CSV, including the run number in the CSV
-        std::string csv_filename = "data/rosenbrock_data_run" + std::to_string(run) + ".csv";
-        exportFitnessToCSV(fitness_history, csv_filename);
-    }
-
-    // Step testing
-    std::cout << "\nSTEP FUNCTION:" << std::endl;
-    n = 5;
-    range = 5.12;
-
-    std::cout << "Run # | Initial Candidate | Final Candidate:" << std::endl;
-    for (int run = 0; run < 30; run++) {
-        initial_candidate = generate_random_vector(n, {-range, range});
-
-        auto result = hill_climb(initial_candidate, "step"); // Start hill climber
-        fitness_history = result.first;
-        final_candidate = result.second;
-
-        std::cout << run;
-        std::cout << " | ";
-        print_vector(initial_candidate);
-        std::cout << "\t-> ";
-        print_vector(final_candidate);
-        std::cout << std::endl;
-
-        // Export fitness history to CSV, including the run number in the CSV
-        std::string csv_filename = "data/step_data_run" + std::to_string(run) + ".csv";
-        exportFitnessToCSV(fitness_history, csv_filename);
-    }
+    // Step
+    run_experiment("STEP FUNCTION", "step", 5, 5.12, "data/step_data_run");
     return 0;
 }
