@@ -7,17 +7,20 @@ In this assignment, you will implement a hill climbing (or hill descending) algo
 For this assignment, we will focus on minimizing the following three DeJong functions:
 
 ### DeJong's Function #1 (Sphere Function)
-- **Formula:** *[Formula not provided in original text]*
+$f_1(\mathbf{x}) = \sum_{i=1}^{n} x_i^2$
+
 - Typically evaluated in a 3-dimensional space (n=3), with a search range of [-5.12, 5.12] for each dimension
 - The global minimum is at (0, 0, 0)
 
 ### DeJong's Function #2 (Rosenbrock Function)
-- **Formula:** *[Formula not provided in original text]*
+$f_2(\mathbf{x}) = \sum_{i=1}^{n-1} \left[100(x_{i+1} - x_i^2)^2 + (x_i - 1)^2\right]$
+
 - Typically evaluated in a 2-dimensional space (n=2), with a search range of [-2.048, 2.048] for each dimension
 - The global minimum is at (1, 1)
 
 ### DeJong's Function #3 (Step Function)
-- **Formula:** *[Formula not provided in original text]*
+$f_3(\mathbf{x}) = \sum_{i=1}^{n} \lfloor x_i \rfloor$
+
 - Typically evaluated in a 5-dimensional space (n=5), with a search range of [-5.12, 5.12] for each dimension
 - The global minimum is near (0, 0, 0, 0, 0)
 
