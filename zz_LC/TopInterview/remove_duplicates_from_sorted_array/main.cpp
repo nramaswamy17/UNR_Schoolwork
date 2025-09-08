@@ -23,6 +23,7 @@ using namespace std;
 class Solution {
 public:
 
+    // Two pointer solution
     int removeDuplicates(vector<int>& nums) {
         int writeIndex = 0;
         int readIndex;
@@ -38,6 +39,7 @@ public:
         return distinct_nums;
     }
 
+    // Slow version (first attempt)
     int removeDuplicates2(vector<int>& nums) {
         // Your solution goes here
         int current_number;
