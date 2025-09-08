@@ -72,7 +72,7 @@ double get_fitness(const std::vector<double>& candidate, const std::string& func
 std::pair<std::vector<double>, std::vector<double>> hill_climb(
     std::vector<double> current,
     const std::string& function_name,
-    double step_size = .1,
+    double step_size = 1,
     int max_iterations = 1000,
     std::pair<double, double> bounds = {-5.12, 5.12}
 ) {
@@ -86,7 +86,8 @@ std::pair<std::vector<double>, std::vector<double>> hill_climb(
 
     for (int i = 0; i < max_iterations; ++i) {
 
-        // step size multiplier
+        // step size scaling
+        float step_size_adj = step_size / (1 + i % 100); // every 100 iterations make the step size smaller
 
         // Store current fitness for current iteration
         fitness_history.push_back(current_fitness);
@@ -95,7 +96,7 @@ std::pair<std::vector<double>, std::vector<double>> hill_climb(
         std::vector<double> neighbor = current;
         for (size_t j = 0; j < neighbor.size(); ++j) {
             // Create a new normal distribution for each dimension to ensure proper randomization
-            std::normal_distribution<double> dist(0.0, step_size);
+            std::normal_distribution<double> dist(0.0, step_size_adj);
             neighbor[j] += dist(gen);
             neighbor[j] = std::max(bounds.first, std::min(bounds.second, neighbor[j]));
         }
@@ -165,7 +166,7 @@ void run_experiment(const std::string& label,
     };
 
     std::cout << "Run # | Fitness | Initial Candidate | Final Candidate:" << std::endl;
-    for (int run = 0; run < 100; run++) {
+    for (int run = 0; run < 10000; run++) {
         std::vector<double> initial_candidate = generate_random_vector(dimensions, {-range, range});
 
         // Determine bounds per function
@@ -175,7 +176,7 @@ void run_experiment(const std::string& label,
         auto result = hill_climb(initial_candidate, function_name, .1, 1000, bounds); // Start hill climber
         std::vector<double> fitness_history = result.first;
         std::vector<double> final_candidate = result.second;
-
+        /*
         std::cout << run;
         std::cout << " | ";
         std::cout << fitness_history.back();
@@ -184,7 +185,7 @@ void run_experiment(const std::string& label,
         std::cout << "\t-> ";
         print_vector(final_candidate);
         std::cout << std::endl;
-
+        */
         // Export fitness history to CSV, including the run number in the CSV
         std::string csv_filename = csv_prefix + std::to_string(run) + ".csv";
         exportFitnessToCSV(fitness_history, final_candidate, csv_filename);
