@@ -1,0 +1,161 @@
+\documentclass{article}
+\usepackage{graphicx} % 
+\usepackage{subfig}
+\usepackage{float}
+
+\title{CS776 Assignment0 - Hill Descender}
+\author{Neal Ramaswamy}
+\date{September 2025}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+\subsection{Purpose}
+The purpose of this assignment is to implement a program to find the global minima of the Dejong functions Sphere, Rosenbrock, and Step.
+
+\section{Implementation}
+\section{Algorithm Implementation}
+\paragraph{Initial Solution Generation} The initial candidate solution is generated probabilistically from a uniform distribution that matches the range provided. 
+\paragraph{Neighbor Generation} The neighboring solutions are generated through probabilistic perturbations from a normal distribution; a step size parameter is introduced to dictate the amount of variance in the generation.
+\paragraph{Acceptance Criteria} The algorithm adopts a greedy mindset - as soon as a better solution is found, it adopts that as the new solution and continues.
+\paragraph{Termination Criteria} The algorithm stops once it reaches the maximum number of iterations parameter. 
+
+\subsection{Algorithm Psuedocode}
+
+The algorithm implemented follows a greedy-style, where it mimics a version of gradient descent where we are unaware of the true function. This is addressed through a normal distribution for generating the next gradient.
+
+\begin{enumerate}
+    \item Determine the fitness of the initial guess 
+    \item For each Iteration
+        \begin{enumerate}
+            \item Set step size based on percentage of the way through the iterations we are
+            \item Store the fitness of the last guess 
+            \item Generate a neighboring solution by adding gaussian noise to our previous guess (step size is the st. dev of the gaussian distribution).
+            \item if the neighbor has a higher fitness, accept that as our current guess; else reject and keep the current best guess
+        \end{enumerate}
+    \item Repeat this process for as many runs as we'd like
+\end{enumerate}
+
+\section{Function Implementation}
+
+\paragraph{Function Validation} All functions were validated through test cases on their global minima and range.
+
+\subsection{Function Definitions}
+\subsubsection{Sphere Function}
+$$f_1(\mathbf{x}) = \sum_{i=1}^{n} x_i^2$$
+
+\subsubsection{Rosenbrock Function}
+$$f_2(\mathbf{x}) = \sum_{i=1}^{n-1} \left[100(x_{i+1} - x_i^2)^2 + (x_i - 1)^2\right]$$
+
+\subsubsection{Step Function}
+$$f_3(\mathbf{x}) = \sum_{i=1}^{n} floor(x_i)$$
+
+\section{Experiment}
+\subsection{Design}
+\subsubsection{Sphere Function Data}
+Runs: 10000\\
+Iterations: 100\\
+Fitness: 0.000000\\
+Best Solution: (2.40172e-05 -1.07062e-05 -2.08052e-05)\\
+Avg. Solution: (0.01940252 0.0141498  0.02825986)\\
+St. Dev Solution (1.851892 1.850866 1.867845)\\
+
+\subsubsection{Rosenbrock Function Data}
+Runs: 10000\\
+Iterations: 100\\
+Dimensions = 2\\
+Fitness: 0.000000\\
+Best Solution: (0.999972 0.999947)\\
+Avg. Solution: (0.30044456 0.4151165)\\
+St.dev Solution: (0.611533 0.519806)\\
+
+\subsubsection{Rosenbrock Function Data}
+Runs: 10000\\
+Iterations: 100\\
+Dimensions = 5\\
+Fitness: -26.000000\\
+Best Solution: (-4.66352 -5.00248 -4.69556 -4.28807 -4.1959)\\
+Avg. Solution: (-0.03623238 -0.04442598 -0.00975828 -0.00536356 -0.02421492)\\
+St.dev Solution: (2.959615 2.960031 2.922822 2.928475 2.968451)\\
+
+\subsubsection{Table}
+\begin{table}[H]
+\centering
+\caption{Experimental Results for Optimization Functions}
+\label{tab:results}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Parameter} & \textbf{Sphere} & \textbf{Rosenbrock} & \textbf{Step} \\
+\hline
+Runs & 10,000 & 10,000 & 10,000 \\
+Iterations & 100 & 100 & 100 \\
+Dimensions & 3 & 2 & 5 \\
+Range & [-5.12, 5.12] & [-2.048, 2.048] & [-5.12, 5.12] \\
+\hline
+\textbf{Best Fitness} & 0.000000 & 0.000000 & -26.000000 \\
+\hline
+\multicolumn{4}{|c|}{\textbf{Best Solution}} \\
+\hline
+$x_1$ & $2.40 \times 10^{-5}$ & 0.999972 & -4.66352 \\
+$x_2$ & $-1.07 \times 10^{-5}$ & 0.999947 & -5.00248 \\
+$x_3$ & $-2.08 \times 10^{-5}$ & - & -4.69556 \\
+$x_4$ & - & - & -4.28807 \\
+$x_5$ & - & - & -4.1959 \\
+\hline
+\multicolumn{4}{|c|}{\textbf{Average Solution}} \\
+\hline
+$x_1$ & 0.01940252 & 0.30044456 & -0.03623238 \\
+$x_2$ & 0.0141498 & 0.4151165 & -0.04442598 \\
+$x_3$ & 0.02825986 & - & -0.00975828 \\
+$x_4$ & - & - & -0.00536356 \\
+$x_5$ & - & - & -0.02421492 \\
+\hline
+\multicolumn{4}{|c|}{\textbf{Standard Deviation}} \\
+\hline
+$x_1$ & 1.851892 & 0.611533 & 2.959615 \\
+$x_2$ & 1.850866 & 0.519806 & 2.960031 \\
+$x_3$ & 1.867845 & - & 2.922822 \\
+$x_4$ & - & - & 2.928475 \\
+$x_5$ & - & - & 2.968451 \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Data: Visualized}
+
+\begin{figure}[H]
+    \centering
+    \subfloat[Rosenbrock Function]{\includegraphics[width=0.5\textwidth]{Rosenbrock_Function.png}\label{fig:rosenbrock}}
+    \hfill
+    \subfloat[Sphere Function]{\includegraphics[width=0.5\textwidth]{Sphere_Function.png}\label{fig:sphere}}
+    \hfill
+    \subfloat[Step Function]{\includegraphics[width=0.5\textwidth]{Step_Function.png}\label{fig:step}}
+    \caption{Comparison of different functions}
+    \label{fig:functions}
+\end{figure}
+
+\section{Discussion}
+\paragraph{How did each function perform?}
+Sphere and Rosenbrock hill descent was successful in converging to the global minimum within 100 iterations. \\
+Step hill descent was close, but not successful. Step ended up at a minimum of -26. 
+
+\paragraph{Why did certain functions perform better?}
+The algorithm I developed functions is functionally a blinded person stopping randomly around himself to feel which way is lower. Therefore, the algorithm will function optimally on a smooth curve, and poorly in bumpy or flat regions.\\
+Step performed extremely poorly (unable to find global minimmum despite 10000 runs) because it is entirely flat regions. This means the success is dependent on the initial guess being relatively close to global minimum. \\
+Because my algorithm uses a uniform distribution and there are 5 dimensions, the odds of this are extremely low. 
+
+
+\paragraph{What challenges occurred?}
+\begin{enumerate}
+    \item The implementation was initially unable to find the global minimum effectively, so I created a step size factor adjustment. As a result, step size would be large initially, and decrease by a factor as the number of iterations went up. I hypothesize this prevented the system from bouncing out of minima.
+    \item The implementation was unable to find the global minimum (or even get close). From the data (Fig 1c.), it was apparent that successful solutions are based largely on luck on where the initial generation occurs, so I increased the number of runs from 30 -> 10000.
+\end{enumerate}
+
+\paragraph{Improvements} In the future, it may be worth exploring concurrent programming. The lack of concurrent programming made it prohibitively expensive to introduce the variance in candidate solution guessing that may have yielded the true global minimum of the step function repeatably even with fewer runs. 
+
+\end{document}
+
+
