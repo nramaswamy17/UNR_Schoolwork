@@ -29,6 +29,15 @@ Print the results to test that everything works
 
 #include <random>
 
+// Global random number generator for better efficiency and uniformity
+std::random_device rd;
+std::mt19937 gen(rd());
+
+// Function to set seed for reproducible results
+void set_random_seed(unsigned int seed) {
+    gen.seed(seed);
+}
+
 // Generates a vector of random doubles within the given range [min_val, max_val]
 // num_dimensions: number of elements in the vector
 // range: a std::pair<double, double> representing [min_val, max_val]
@@ -42,8 +51,6 @@ std::vector<double> generate_random_vector(int num_dimensions, std::pair<double,
         throw std::invalid_argument("Invalid range: min_val is greater than max_val.");
     }
 
-    std::random_device rd;
-    std::mt19937 gen(rd());
     std::uniform_real_distribution<double> dist(min_val, max_val);
 
     std::vector<double> vec(num_dimensions);
@@ -76,9 +83,6 @@ std::pair<std::vector<double>, std::vector<double>> hill_climb(
     int max_iterations = 1000,
     std::pair<double, double> bounds = {-5.12, 5.12}
 ) {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-
     std::vector<double> fitness_history;
     fitness_history.reserve(max_iterations);
 
@@ -94,9 +98,9 @@ std::pair<std::vector<double>, std::vector<double>> hill_climb(
         
         // Generate neighbor by adding small random changes
         std::vector<double> neighbor = current;
+        // Create normal distribution once per iteration (more efficient)
+        std::normal_distribution<double> dist(0.0, step_size_adj);
         for (size_t j = 0; j < neighbor.size(); ++j) {
-            // Create a new normal distribution for each dimension to ensure proper randomization
-            std::normal_distribution<double> dist(0.0, step_size_adj);
             neighbor[j] += dist(gen);
             neighbor[j] = std::max(bounds.first, std::min(bounds.second, neighbor[j]));
         }
@@ -166,7 +170,7 @@ void run_experiment(const std::string& label,
     };
 
     std::cout << "Run # | Fitness | Initial Candidate | Final Candidate:" << std::endl;
-    for (int run = 0; run < 10000; run++) {
+    for (int run = 0; run < 1000; run++) {
         std::vector<double> initial_candidate = generate_random_vector(dimensions, {-range, range});
 
         // Determine bounds per function
@@ -193,6 +197,8 @@ void run_experiment(const std::string& label,
 }
 
 int main() {
+    // Set seed for reproducible results (comment out for random results)
+    set_random_seed(42);  // Change this number to get different but reproducible results
 
     int n; 
     double range;
