@@ -15,6 +15,9 @@ class FloorplanGA {
 private:
     std::vector<RoomSpec> roomSpecs;
     std::vector<Chromosome> population;
+
+    // Constant
+    double theoretical_min = 632.5;
     
     // GA Parameters
     int populationSize;
@@ -146,7 +149,7 @@ private:
     }
 
     double calculateFitnessScore(double fitness) {
-        double theoretical_min = 632.5;  // sum of min areas with cost multipliers
+        theoretical_min = 632.5;  // sum of min areas with cost multipliers
         return 100.0 * (theoretical_min / fitness);
     }
     
@@ -285,13 +288,18 @@ private:
     
 public:
     FloorplanGA(int popSize = 100, int gens = 200, double xRate = 0.8, 
-                double mRate = 0.15, int elite = 5, int tournSize = 5)
+                double mRate = 0.15, int elite = 5, int tournSize = 5, unsigned int seed = 0)
         : populationSize(popSize), numGenerations(gens), crossoverRate(xRate),
           mutationRate(mRate), eliteCount(elite), tournamentSize(tournSize),
           bestSolution(7)
     {
-        std::random_device rd;
-        gen = std::mt19937(rd());
+        if (seed == 0) {
+            std::random_device rd;
+            gen = std::mt19937(rd());
+        } else {
+            gen = std::mt19937(seed);
+        }
+
         initializeRoomSpecs();
     }
     
@@ -302,6 +310,8 @@ public:
         std::cout << "Crossover Rate: " << crossoverRate << "\n";
         std::cout << "Mutation Rate: " << mutationRate << "\n\n";
         
+        std::cout << "Theoretical Min cost: " << theoretical_min << "\n";
+
         initializePopulation();
         
         std::cout << "Initial Best Fitness: " << std::fixed << std::setprecision(2) 
@@ -314,7 +324,8 @@ public:
                 std::cout << "Generation " << std::setw(3) << (gen + 1) 
                      << " | Best: " << std::setw(8) << population[0].fitness
                      << " | Avg: " << std::setw(8) << avgFitnessHistory.back()
-                     << " | Avg. Fitness " << calculateFitnessScore(bestSolution.fitness) << "\n";
+                     << " | Avg. Fitness " << calculateFitnessScore(avgFitnessHistory.back())
+                     << " | Best Fitness " << calculateFitnessScore(population[0].fitness) << "\n";
                 }
         }
         

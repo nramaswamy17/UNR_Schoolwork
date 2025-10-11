@@ -13,7 +13,7 @@ struct Chromosome {
         : rooms(numRooms), fitness(std::numeric_limits<double>::max()) {}
     
     bool operator<(const Chromosome& other) const {
-        return fitness < other.fitness;
+        return fitness < other.fitness; // Minimization
     }
 };
 
