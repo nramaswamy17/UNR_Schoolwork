@@ -67,7 +67,7 @@ A real-coded representation is used. Each room contributes four genes $(\text{le
 Length/width genes are clamped to their per-room bounds in Table~\ref{tab:floorplan_constraints}; $(x,y)$ are bounded by a conservative enclosing rectangle computed from the sum of minimum areas and aspect constraints.
 
 \paragraph{Decoding.}
-A chromosome decodes to axis-aligned rectangles at $(x,y)$ with $(\text{len},\text{wid})$. We do not repair infeasibility; instead, violations (out-of-bounds, overlap, doorway clearance, aspect tolerance) are translated to additive penalties $\Pi(\mathbf{x})$ (Section~\ref{sec:penalties}). The optimizer minimizes $C(\mathbf{x})+\Pi(\mathbf{x})$.
+A chromosome decodes to axis-aligned rectangles at $(x,y)$ with $(\text{len},\text{wid})$. No feasibility repair is performed; instead, violations (out-of-bounds, overlap, doorway clearance, aspect tolerance) are translated to additive penalties $\Pi(\mathbf{x})$ (Section~\ref{sec:penalties}). The optimizer minimizes $C(\mathbf{x})+\Pi(\mathbf{x})$.
 
 \subsection{Assumptions and Their Relationship to Encoding}
 The following modeling assumptions render the problem tractable; each constrains the encoding and/or the penalty function.
@@ -81,14 +81,14 @@ The following modeling assumptions render the problem tractable; each constrains
 \end{enumerate}
 
 \subsection{Objective Function}
-We minimize total cost:
+Total cost is minimized:
 \[
 \min\; C(\mathbf{x})=\sum_{r \in \mathcal{R}} \big(\text{mult}_r \cdot \text{area}_r \big)
 \]
-For feasible solutions, this is the sum of areas with Kitchen/Bath doubled. A theoretical lower bound from per-room minima prints as ``Theoretical Min cost: 632.5'' (tight only if all constraints were jointly attainable).
+For feasible solutions, this is the sum of areas with Kitchen/Bath doubled. A theoretical lower bound from per-room minima is ``Theoretical Min cost: 632.5'' (tight only if all constraints were jointly attainable).
 
 \subsection{Reporting Conventions (Cost vs.\ Fitness)}
-\textbf{We minimize cost.} Optimization is performed on
+\textbf{Total cost is minimized.} Optimization is performed on
 \[
 C(\mathbf{x}) = \sum_{r \in \mathcal{R}} \big(\text{mult}_r \cdot \text{area}_r \big) + \Pi(\mathbf{x}),
 \]
@@ -175,7 +175,8 @@ Gen 2000: Best Cost  790.96 | Avg Cost  8691.64
 \end{figure}
 
 \subsection{Best Solution Found}
-At termination, a feasible layout with cost $790.96$ and raw cost $699.84$ (penalty $=0$):
+At termination, a feasible layout with cost $790.96$:
+
 \begin{center}
 \begin{tabular}{lrrrrr}
 \toprule
@@ -189,7 +190,7 @@ Bed1    & 14.99 & 10.02 & 150.11 &  5.55 & 17.57 \\
 Bed2    & 12.60 &  9.00 & 113.42 & 15.58 & 24.22 \\
 Bed3    & 12.55 &  8.00 & 100.37 & 24.58 & 24.26 \\
 \midrule
-\multicolumn{6}{r}{Total Area: 603.07 \qquad Total Cost: 699.84} \\
+\multicolumn{6}{r}{Total Area: 603.07 \qquad Total Cost: 790.96} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -265,7 +266,7 @@ Across $R{=}30$ seeds the GA reached the same best value (16) in every run, whil
 
 \section{Traveling Salesperson via Genetic Algorithms}
 \subsection{Problem Statement}
-We address symmetric TSPLIB instances with Euclidean (\texttt{EUC\_2D}) or Geographical (\texttt{GEO}) edge weights. The optimization objective is to \emph{minimize} tour length; the evolutionary search \emph{maximizes} a fitness monotonically related to $1/\text{length}$.
+Symmetric TSPLIB instances with Euclidean (\texttt{EUC\_2D}) or Geographical (\texttt{GEO}) edge weights are addressed. The objective is to \emph{minimize} tour length; the evolutionary search \emph{maximizes} a fitness monotonically related to $1/\text{length}$.
 
 \subsection{Method}
 \paragraph{Encoding.} Candidate = permutation (tour) of cities.
