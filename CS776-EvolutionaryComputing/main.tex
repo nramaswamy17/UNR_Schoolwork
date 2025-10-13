@@ -61,7 +61,7 @@ for \{\textit{Living, Kitchen, Bath, Hall, Bed1, Bed2, Bed3}\}. Areas are $\text
 
 \subsection{Encoding Precision and Decoding}
 \paragraph{Chromosome and precision.}
-We use a real-coded representation. Each room contributes four genes $(\text{len},\text{wid},x,y)$; the chromosome length is $7\times4=28$ reals. Unless otherwise stated, genes are maintained at two-decimal precision (grid size $0.01$).
+A real-coded representation is used. Each room contributes four genes $(\text{len},\text{wid},x,y)$; the chromosome length is $7\times4=28$ reals. Unless otherwise stated, genes are maintained at two-decimal precision (grid size $0.01$).
 
 \paragraph{Ranges.}
 Length/width genes are clamped to their per-room bounds in Table~\ref{tab:floorplan_constraints}; $(x,y)$ are bounded by a conservative enclosing rectangle computed from the sum of minimum areas and aspect constraints.
@@ -272,7 +272,7 @@ We address symmetric TSPLIB instances with Euclidean (\texttt{EUC\_2D}) or Geogr
 \paragraph{Fitness and Objective.} Fitness $f(\mathbf{c}) = 1/\ell(\mathbf{c})$ (shorter tours $\Rightarrow$ higher fitness).
 \paragraph{Selection/Replacement.} \textbf{CHC} with incest prevention and deterministic elitist replacement \cite{eshelman1991chc}.
 \paragraph{Variation.} Crossover: \textbf{PMX} \cite{goldberg1985pmx}; Mutation: swap and invert (2-point reversal). Typical rates: $p_c{=}0.9$, $p_m{=}0.01$.
-\paragraph{Distance.} We compute distances exactly as specified by TSPLIB headers: \texttt{EUC\_2D} uses rounded Euclidean distances; \texttt{GEO} uses the great-circle convention with TSPLIB latitude/longitude parsing and rounding \cite{reinelt1991tsplib}.
+\paragraph{Distance.} Distances are computed exactly as specified by TSPLIB headers: \texttt{EUC\_2D} uses rounded Euclidean distances; \texttt{GEO} uses the great-circle convention with TSPLIB latitude/longitude parsing and rounding \cite{reinelt1991tsplib}.
 \paragraph{Local Search (Subpart 2).} After GA convergence, run \textbf{2-Opt} to local optimality \cite{lin1973lk}. Record post-2-Opt tour length and number of swaps.
 \paragraph{Aggregate Metrics.} For each instance and $R\ge 30$, compute:
 Quality $=\frac{\overline{\text{best}}-\text{OPT}}{\text{OPT}}\times100\%$;
@@ -413,7 +413,7 @@ Instance & Cities & GA Quality (\%) & 2-Opt Quality (\%) & $\Delta$ (pp) & Avg \
 A permutation-only GA with PMX stalls without local search. CHC’s threshold and cataclysms help diversity but do not enforce edge structure. The effective recipe is \emph{edge-aware recombination + local search}. PMX is serviceable; OX/ERX often preserve edges better; with 2-Opt, the difference narrows. To push closer to OPT on larger sets: (i) use a memetic GA (2-Opted offspring each generation), (ii) maintain selection pressure via rank-based/shifted fitness \cite{potvin1996gaTSP,johnson1997tspLocal,nagata2013eax}.
 
 \subsection{What counts as ``Speed''}
-We define Speed as mean evaluations (over seeds) to reach the Quality threshold (the GA’s mean Quality per instance). For stricter auditing, a fixed bar (e.g., $\le 10\%$ over OPT) can also be reported.
+Speed is defined as mean evaluations (over seeds) to reach the Quality threshold (the GA’s mean Quality per instance). For stricter auditing, a fixed bar (e.g., $\le 10\%$ over OPT) can also be reported.
 
 \section{References}
 \begin{thebibliography}{99}
