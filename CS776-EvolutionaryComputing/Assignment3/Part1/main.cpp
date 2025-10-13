@@ -15,6 +15,6 @@ int main() {
     
     ga.run();
     ga.printBestSolution();
-    //ga.exportResults();
+    ga.exportResults();
     return 0;
 }

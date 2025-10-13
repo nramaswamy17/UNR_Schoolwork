@@ -1,0 +1,23 @@
+
+================================================================================
+LATEX TABLE OUTPUT
+================================================================================
+
+\begin{table}[H]
+\centering
+\caption{Reliability and Speed (R$\ge$30). Reliability is \% of runs meeting the Quality threshold; Speed is mean evaluations to first meet it.}
+\label{tab:tsp_rel_speed}
+\begin{tabular}{lrrrr}
+\toprule
+Instance & Reliability$_\mathrm{GA}$ (\%) & Reliability$_{\mathrm{GA}\to\mathrm{2\text{-}Opt}}$ (\%) & Speed$_\mathrm{GA}$ (evals) & Speed$_{\mathrm{GA}\to\mathrm{2\text{-}Opt}}$ (evals) \\
+\midrule
+\texttt{berlin52} &   53.3 &   56.7 &  12393 &  12490 \\
+\texttt{burma14 } &   56.7 &   60.0 &   1310 &   1330 \\
+\texttt{eil51   } &   60.0 &   53.3 &  12312 &  12245 \\
+\texttt{eil76   } &   50.0 &   56.7 &  28179 &  26888 \\
+\texttt{lin105  } &   46.7 &   53.3 &  38346 &  38935 \\
+\texttt{lin318  } &   40.0 &   50.0 & 125788 & 125857 \\
+\bottomrule
+\end{tabular}
+\end{table}
+

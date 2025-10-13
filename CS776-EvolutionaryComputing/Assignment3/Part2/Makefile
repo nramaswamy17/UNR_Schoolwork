@@ -25,6 +25,6 @@ test: $(TARGET)
 
 run: $(TARGET)
 	@echo "Running GA..."
-	./$(TARGET) ga 50 100 0.01 0.9 3 10
+	./$(TARGET) ga 50 100 0.01 0.9 3 30
 	@echo "Running HC..."
-	./$(TARGET) hc 1000 10
+	./$(TARGET) hc 1000 30
