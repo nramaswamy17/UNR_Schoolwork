@@ -59,7 +59,7 @@ void process_seed(const string& instance, Graph& graph,
     MetaGA ga(geneLen, chromLen, seed);
     
     auto start = clock();
-    ga.run(router, log, seed);
+    ga.run(router, log, log_mutex, seed);
     double elapsed = (clock() - start) / (double)CLOCKS_PER_SEC;
     
     double bestObj = 1.0/ga.bestFitness;

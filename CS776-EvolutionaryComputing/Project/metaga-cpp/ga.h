@@ -12,6 +12,7 @@
 #include <limits>
 #include <sstream>
 #include <filesystem>
+#include <mutex>
 
 #include "router.h"
 using namespace std;
@@ -112,12 +113,16 @@ public:
         population = newPop;
     }
     
-    void run(Router& router, ofstream& log, int seed) {
+    void run(Router& router, ofstream& log, std::mutex& log_mutex, int seed) {
         initialize();
         
         for(int gen = 0; gen < numGens; gen++) {
             evaluatePopulation(router);
-            log << seed << "," << gen << "," << (1.0/bestFitness) << endl;
+            {
+                std::lock_guard<std::mutex> lock(log_mutex);
+                log << seed << "," << gen << "," << (1.0/bestFitness) << endl;
+                log.flush();
+            }
             if(gen % 10 == 0) cout << ".";
             if(gen < numGens-1) evolve(router);
         }
