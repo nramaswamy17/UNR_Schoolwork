@@ -4,7 +4,7 @@
 mkdir -p results
 
 # clear results directory
-rm -rf results/*
+#rm -rf results/*
 
 # Create build directory
 mkdir -p build

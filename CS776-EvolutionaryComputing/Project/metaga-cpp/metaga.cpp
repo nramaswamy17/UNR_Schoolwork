@@ -10,6 +10,11 @@
 #include <sstream>
 #include <filesystem>
 
+// Multi threading
+#include <thread>
+#include <mutex>
+#include <queue>
+
 #include "tour.h"
 #include "graph.h"
 #include "router.h"
@@ -40,9 +45,33 @@ vector<string> list_dat_files(const string& dir, bool test) {
     return files;
 }
 
+void process_seed(const string& instance, Graph& graph,
+                const vector<int>& depots, int seed, 
+                const string& logfile, ofstream& log, 
+                std::mutex& log_mutex, vector<double>& results,
+                string basename, int geneLen, int chromLen,
+                vector<double>& bestObjectives
+                ) {
+
+    cout << "Running " << basename << " seed " << seed << "... ";
+    
+    Router router(graph, depots, seed);
+    MetaGA ga(geneLen, chromLen, seed);
+    
+    auto start = clock();
+    ga.run(router, log, seed);
+    double elapsed = (clock() - start) / (double)CLOCKS_PER_SEC;
+    
+    double bestObj = 1.0/ga.bestFitness;
+    bestObjectives.push_back(bestObj);
+    
+    cout << "Best: " << bestObj << " in " << elapsed << "s" << endl;
+
+}
+
 int main() {
     // Benchmarks: populate from benchmarks/ directory (all .dat files)
-    bool test = true;
+    bool test = false;
     vector<string> instances = list_dat_files("benchmarks", test);
 
     vector<int> depots = {0, 0, 0, 0};  // 4 robots at depot 0 (vertex 1)
@@ -51,6 +80,12 @@ int main() {
 
     for(string instance : instances) {
         Graph graph(instance);
+        mutex log_mutex;
+        vector<double> results;
+        vector<thread> threads;
+
+        const int MAX_THREADS = 16;
+
         cout << "Loaded " << instance << ": " << graph.nVertices << " vertices, " << graph.nEdges << " edges" << endl;
         
         int geneLen = 2;
@@ -67,21 +102,25 @@ int main() {
         vector<double> bestObjectives;
         
         for(int seed : seeds) {
-            cout << "Running " << basename << " seed " << seed << "... ";
             
-            Router router(graph, depots, seed);
-            MetaGA ga(geneLen, chromLen, seed);
+            if (threads.size() >= MAX_THREADS) {
+                threads.front().join();
+                threads.erase(threads.begin());
+            }
+            threads.emplace_back(process_seed, instance, ref(graph), 
+                                ref(depots), seed, logfile, 
+                                ref(log), ref(log_mutex), ref(results),
+                                basename, geneLen, chromLen,
+                                ref(bestObjectives));
             
-            auto start = clock();
-            ga.run(router, log, seed);
-            double elapsed = (clock() - start) / (double)CLOCKS_PER_SEC;
-            
-            double bestObj = 1.0/ga.bestFitness;
-            bestObjectives.push_back(bestObj);
-            
-            cout << "Best: " << bestObj << " in " << elapsed << "s" << endl;
+            //process_seed(instance, graph, depots, seed, logfile, log, log_mutex, results, basename, geneLen, chromLen, bestObjectives);
         }
-        
+
+        // Wait for all threads to finish
+        for(auto& t: threads) {
+            t.join();
+        }
+
         log.close();
         
         // Write summary
