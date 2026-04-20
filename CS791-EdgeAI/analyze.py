@@ -41,12 +41,10 @@ def load_sweep(path):
             if line:
                 rows.append(json.loads(line))
     df = pd.DataFrame(rows)
-    # Friendly label column
     def label(row):
         if row["method"] == "lora":
             return f"LoRA-r{int(row['rank'])} ({row['placement']})"
-        return {"head": "Last-layer", "bitfit": "BitFit",
-                "full": "Full FT"}[row["method"]]
+        return {"head": "Last-layer", "bitfit": "BitFit", "full": "Full FT"}[row["method"]]
     df["label"] = df.apply(label, axis=1)
     return df
 
@@ -73,13 +71,18 @@ METHOD_LABELS = {
     "bitfit": "BitFit",
     "full":   "Full FT",
 }
+NON_LORA_MARKERS = {
+    "head":   ("D", 100),
+    "bitfit": ("^", 100),
+    "full":   ("s", 100),
+}
 
 plt.rcParams.update({
-    "font.family":    "sans-serif",
-    "font.size":      11,
+    "font.family":       "sans-serif",
+    "font.size":         11,
     "axes.spines.top":   False,
     "axes.spines.right": False,
-    "figure.dpi":     150,
+    "figure.dpi":        150,
 })
 
 
@@ -95,39 +98,37 @@ def savefig(fig, path):
 # ─────────────────────────────────────────────
 
 def fig_pareto_params(df, bench_df, out):
-    """
-    X: trainable params (from benchmark)
-    Y: mean adapted accuracy across all conditions (from sweep)
-    One point per method; LoRA gets one point per rank.
-    """
     fig, ax = plt.subplots(figsize=(7, 5))
 
-    # Mean acc per (method, rank, placement) averaged over corruption × severity
-    grp = df.groupby(["method", "rank", "placement"])["best_adapted_acc"].mean().reset_index()
-
-    for _, row in grp.iterrows():
-        method = row["method"]
-        if method == "lora":
-            lbl = f"lora_r{int(row['rank'])}_{row['placement']}"
-        else:
-            lbl = method
+    # LoRA — group by rank+placement (avoids NaN-drop from groupby with non-LoRA)
+    lora_df  = df[df["method"] == "lora"]
+    lora_grp = lora_df.groupby(["rank", "placement"])["best_adapted_acc"].mean().reset_index()
+    for _, row in lora_grp.iterrows():
+        lbl   = f"lora_r{int(row['rank'])}_{row['placement']}"
         match = bench_df[bench_df["label"] == lbl]
         if match.empty:
             continue
+        x, y = match["trainable_params"].values[0], row["best_adapted_acc"]
+        ax.scatter(x, y, color=COLORS["lora"], marker="o", s=80, zorder=3)
+        ax.annotate(f"r={int(row['rank'])}", (x, y),
+                    textcoords="offset points", xytext=(5, 3), fontsize=8)
+
+    # Non-LoRA — group by method only (rank/placement are NaN, can't groupby)
+    for method, (marker, size) in NON_LORA_MARKERS.items():
+        sub = df[df["method"] == method]
+        if sub.empty:
+            continue
+        y     = sub["best_adapted_acc"].mean()
+        match = bench_df[bench_df["label"] == method]
+        if match.empty:
+            continue
         x = match["trainable_params"].values[0]
-        y = row["best_adapted_acc"]
-        color = COLORS[method]
-        marker = "o" if method == "lora" else {"head": "s", "bitfit": "^", "full": "D"}[method]
-        ax.scatter(x, y, color=color, marker=marker, s=80, zorder=3)
-        if method == "lora":
-            ax.annotate(f"r={int(row['rank'])}", (x, y),
-                        textcoords="offset points", xytext=(5, 3), fontsize=8)
+        ax.scatter(x, y, color=COLORS[method], marker=marker, s=size, zorder=3)
+        ax.annotate(METHOD_LABELS[method], (x, y),
+                    textcoords="offset points", xytext=(5, 3), fontsize=8)
 
-    # Legend
-    patches = [mpatches.Patch(color=COLORS[m], label=METHOD_LABELS[m])
-               for m in COLORS]
+    patches = [mpatches.Patch(color=COLORS[m], label=METHOD_LABELS[m]) for m in COLORS]
     ax.legend(handles=patches, loc="lower right", fontsize=9)
-
     ax.set_xscale("log")
     ax.set_xlabel("Trainable Parameters")
     ax.set_ylabel("Mean Adapted Accuracy")
@@ -145,30 +146,49 @@ def fig_pareto_params(df, bench_df, out):
 def fig_pareto_latency(df, bench_df, out):
     fig, ax = plt.subplots(figsize=(7, 5))
 
-    grp = df.groupby(["method", "rank", "placement"])["best_adapted_acc"].mean().reset_index()
-
-    for _, row in grp.iterrows():
-        method = row["method"]
-        lbl = (f"lora_r{int(row['rank'])}_{row['placement']}"
-               if method == "lora" else method)
+    # LoRA points
+    lora_df  = df[df["method"] == "lora"]
+    lora_grp = lora_df.groupby(["rank", "placement"])["best_adapted_acc"].mean().reset_index()
+    lora_points = []
+    for _, row in lora_grp.iterrows():
+        lbl   = f"lora_r{int(row['rank'])}_{row['placement']}"
         match = bench_df[bench_df["label"] == lbl]
         if match.empty:
             continue
-        x = match["latency_mean_ms"].values[0]
-        y = row["best_adapted_acc"]
-        ax.scatter(x, y, color=COLORS[method], marker="o", s=80, zorder=3)
-        if method == "lora":
-            ax.annotate(f"r={int(row['rank'])}", (x, y),
-                        textcoords="offset points", xytext=(4, 3), fontsize=8)
+        x, y = match["latency_mean_ms"].values[0], row["best_adapted_acc"]
+        ax.scatter(x, y, color=COLORS["lora"], marker="o", s=80, zorder=3)
+        ax.annotate(f"r={int(row['rank'])}", (x, y),
+                    textcoords="offset points", xytext=(4, 3), fontsize=8)
+        lora_points.append((x, y))
 
-    patches = [mpatches.Patch(color=COLORS[m], label=METHOD_LABELS[m])
-               for m in COLORS]
+    # Connect LoRA rank points with dashed line
+    if lora_points:
+        lora_points.sort(key=lambda p: p[0])
+        xs, ys = zip(*lora_points)
+        ax.plot(xs, ys, color=COLORS["lora"], linewidth=1.2,
+                linestyle="--", zorder=2, alpha=0.6)
+
+    # Non-LoRA points
+    for method, (marker, size) in NON_LORA_MARKERS.items():
+        sub = df[df["method"] == method]
+        if sub.empty:
+            continue
+        y     = sub["best_adapted_acc"].mean()
+        match = bench_df[bench_df["label"] == method]
+        if match.empty:
+            continue
+        x = match["latency_mean_ms"].values[0]
+        ax.scatter(x, y, color=COLORS[method], marker=marker, s=size, zorder=3)
+        ax.annotate(METHOD_LABELS[method], (x, y),
+                    textcoords="offset points", xytext=(4, 3), fontsize=8)
+
+    patches = [mpatches.Patch(color=COLORS[m], label=METHOD_LABELS[m]) for m in COLORS]
     ax.legend(handles=patches, fontsize=9)
     ax.set_xlabel("Inference Latency (ms, CPU batch=1)")
     ax.set_ylabel("Mean Adapted Accuracy")
-    ax.set_title("Accuracy vs. Inference Latency (Pareto)")
+    ax.set_title("Accuracy vs. Inference Latency (Pareto)\n"
+                 "LoRA rank points show mean across all corruptions × severities")
     ax.grid(True, alpha=0.3)
-    # Extend x-axis 15% beyond max latency so no point is clipped
     if not bench_df.empty:
         ax.set_xlim(0, bench_df["latency_mean_ms"].max() * 1.15)
     savefig(fig, out)
@@ -183,7 +203,7 @@ def fig_severity_curves(df, out):
 
     # Zero-shot is a property of the frozen baseline + corrupted data, NOT the
     # adaptation method. Use the method with the most complete corruption ×
-    # severity coverage as the single reference curve to avoid filtering artifacts.
+    # severity coverage as the single reference curve.
     coverage = df.groupby("method").apply(
         lambda g: g.groupby(["corruption", "severity"]).ngroups
     )
@@ -191,7 +211,7 @@ def fig_severity_curves(df, out):
     zero_grp = df[df["method"] == ref_method] \
                  .groupby("severity")["zero_shot_acc"].mean().reset_index()
 
-    # Left panel — zero-shot (single shared curve)
+    # Left panel — single shared zero-shot curve
     ax0 = axes[0]
     ax0.plot(zero_grp["severity"], zero_grp["zero_shot_acc"],
              marker="o", color="black", linewidth=2, label="Baseline (all methods)")
@@ -236,7 +256,6 @@ def fig_rank_sweep(df, bench_df, out):
     ranks    = sorted(lora_df["rank"].dropna().unique())
     acc_vals = [lora_df[lora_df["rank"] == r]["best_adapted_acc"].mean() for r in ranks]
 
-    # Trainable params from benchmark
     param_vals = []
     for r in ranks:
         lbl   = f"lora_r{int(r)}_late"
@@ -246,7 +265,7 @@ def fig_rank_sweep(df, bench_df, out):
     fig, ax1 = plt.subplots(figsize=(7, 5))
     ax2 = ax1.twinx()
 
-    ax1.plot(ranks, acc_vals,  "o-", color=COLORS["lora"],  linewidth=2, label="Accuracy")
+    ax1.plot(ranks, acc_vals, "o-", color=COLORS["lora"], linewidth=2, label="Accuracy")
     ax2.plot(ranks, [p/1e3 for p in param_vals], "s--",
              color="gray", linewidth=1.5, label="Trainable params (K)")
 
@@ -280,10 +299,8 @@ def fig_placement_heatmap(df, out):
         return
 
     fig, ax = plt.subplots(figsize=(10, 4))
-    # Build display array: NaN → unmeasured (hatched), value → colored
-    display = pivot.values.copy()
-    im = ax.imshow(np.where(np.isnan(display), 0, display),
-                   aspect="auto", cmap="RdYlGn", vmin=0.3, vmax=0.9)
+    display = np.where(np.isnan(pivot.values), 0, pivot.values)
+    im = ax.imshow(display, aspect="auto", cmap="RdYlGn", vmin=0.3, vmax=0.9)
     ax.set_xticks(range(len(pivot.columns)))
     ax.set_xticklabels(pivot.columns, rotation=30, ha="right", fontsize=9)
     ax.set_yticks(range(len(pivot.index)))
@@ -296,7 +313,6 @@ def fig_placement_heatmap(df, out):
         for j in range(pivot.shape[1]):
             val = pivot.values[i, j]
             if np.isnan(val):
-                # Hatch unmeasured cells with gray so they read as out-of-scope
                 ax.add_patch(plt.Rectangle(
                     (j - 0.5, i - 0.5), 1, 1,
                     fill=True, facecolor="#cccccc", edgecolor="white",
@@ -318,8 +334,10 @@ def fig_corruption_breakdown(df, out):
     grp = df.groupby(["method", "corruption"])["best_adapted_acc"].mean().reset_index()
     corruptions = sorted(grp["corruption"].unique())
     methods     = list(COLORS.keys())
-    x = np.arange(len(corruptions))
+    x     = np.arange(len(corruptions))
     width = 0.2
+
+    METHOD_MARKERS_BAR = {"head": "/", "bitfit": "\\", "full": "x", "lora": ""}
 
     fig, ax = plt.subplots(figsize=(13, 5))
     for i, method in enumerate(methods):
@@ -327,7 +345,8 @@ def fig_corruption_breakdown(df, out):
         vals = [sub.loc[c, "best_adapted_acc"] if c in sub.index else np.nan
                 for c in corruptions]
         ax.bar(x + i * width, vals, width, label=METHOD_LABELS[method],
-               color=COLORS[method], alpha=0.85)
+               color=COLORS[method], alpha=0.85,
+               hatch=METHOD_MARKERS_BAR[method])
 
     ax.set_xticks(x + width * 1.5)
     ax.set_xticklabels(corruptions, rotation=30, ha="right", fontsize=9)
@@ -377,7 +396,6 @@ def fig_rank_x_severity(df, out):
                 ax.text(j, i, f"{val:.2f}", ha="center", va="center",
                         fontsize=8, color="black")
 
-    # Highlight best rank per severity
     for j in range(pivot.shape[1]):
         col = pivot.values[:, j]
         if not np.all(np.isnan(col)):
@@ -401,7 +419,6 @@ def fig_rank_x_datasize(df, out):
         (df["placement"] == "late")
     ].copy()
 
-    # Only rows that have adapt_size variation
     if "adapt_size" not in lora_df.columns or lora_df["adapt_size"].nunique() < 2:
         print("  [skip fig8] No rank×datasize data yet")
         return
@@ -410,7 +427,7 @@ def fig_rank_x_datasize(df, out):
     sizes = sorted(lora_df["adapt_size"].dropna().unique())
 
     fig, ax = plt.subplots(figsize=(8, 5))
-    cmap = plt.cm.Blues
+    cmap       = plt.cm.Blues
     color_vals = np.linspace(0.4, 1.0, len(ranks))
 
     for rank, cval in zip(ranks, color_vals):
@@ -431,7 +448,9 @@ def fig_rank_x_datasize(df, out):
     savefig(fig, out)
 
 
-
+# ─────────────────────────────────────────────
+# Main
+# ─────────────────────────────────────────────
 
 def main(args):
     print("Loading data...")
