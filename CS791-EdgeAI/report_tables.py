@@ -7,7 +7,8 @@ Produces:
   tables/table1_method_comparison.tex   — main accuracy + resource table
   tables/table2_rank_ablation.tex       — LoRA rank sweep
   tables/table3_placement_ablation.tex  — layer placement results
-  tables/table4_per_corruption.tex      — per-corruption accuracy breakdown
+  tables/table5_h3_rank_severity.tex    — H3a: rank × severity accuracy grid
+  tables/table6_h3_rank_datasize.tex    — H3b: rank × data size accuracy grid
 
 Usage:
     python report_tables.py
@@ -334,8 +335,120 @@ def table_per_corruption(df, out):
 
 
 # ─────────────────────────────────────────────
-# Main
+# Table 5: H3a — rank × severity
 # ─────────────────────────────────────────────
+
+def table_rank_severity(df, out):
+    lora_df = df[
+        (df["method"] == "lora") &
+        (df["corruption"] == "gaussian_noise") &
+        (df["placement"] == "late")
+    ].copy()
+
+    if lora_df.empty:
+        print("  [skip table5] No rank×severity data")
+        return
+
+    ranks      = sorted(lora_df["rank"].dropna().unique())
+    severities = sorted(lora_df["severity"].dropna().unique())
+    pivot      = lora_df.groupby(["rank","severity"])["best_adapted_acc"] \
+                        .mean().unstack(fill_value=np.nan)
+
+    lines = []
+    lines.append(r"\begin{table}[t]")
+    lines.append(r"\centering")
+    lines.append(r"\caption{H3a: Adapted accuracy for LoRA rank $\times$ severity "
+                 r"(gaussian noise, late placement). Bold = best rank per severity.}")
+    lines.append(r"\label{tab:rank_severity}")
+    col_spec = "l" + "c" * len(severities)
+    lines.append(f"\\begin{{tabular}}{{{col_spec}}}")
+    lines.append(r"\toprule")
+    lines.append("Rank $r$ & " +
+                 " & ".join(f"Sev {s}" for s in severities) + r" \\")
+    lines.append(r"\midrule")
+
+    # Best rank per severity for bolding
+    best_per_sev = {}
+    for sev in severities:
+        col_vals = [pivot.loc[r, sev] if sev in pivot.columns and r in pivot.index
+                    else np.nan for r in ranks]
+        best_per_sev[sev] = max((v for v in col_vals if not np.isnan(v)), default=0)
+
+    for r in ranks:
+        row_parts = [str(int(r))]
+        for sev in severities:
+            try:
+                val = pivot.loc[r, sev]
+                is_best = abs(val - best_per_sev[sev]) < 1e-6
+                row_parts.append(bold(val, is_best))
+            except KeyError:
+                row_parts.append("---")
+        lines.append(" & ".join(row_parts) + r" \\")
+
+    lines.append(r"\bottomrule")
+    lines.append(r"\end{tabular}")
+    lines.append(r"\end{table}")
+    save_tex("\n".join(lines), out)
+
+
+# ─────────────────────────────────────────────
+# Table 6: H3b — rank × adapt data size
+# ─────────────────────────────────────────────
+
+def table_rank_datasize(df, out):
+    lora_df = df[
+        (df["method"] == "lora") &
+        (df["corruption"] == "gaussian_noise") &
+        (df["severity"] == 3) &
+        (df["placement"] == "late")
+    ].copy()
+
+    if "adapt_size" not in lora_df.columns or lora_df["adapt_size"].nunique() < 2:
+        print("  [skip table6] No rank×datasize data")
+        return
+
+    ranks = sorted(lora_df["rank"].dropna().unique())
+    sizes = sorted(lora_df["adapt_size"].dropna().unique())
+    pivot = lora_df.groupby(["rank","adapt_size"])["best_adapted_acc"] \
+                   .mean().unstack(fill_value=np.nan)
+
+    lines = []
+    lines.append(r"\begin{table}[t]")
+    lines.append(r"\centering")
+    lines.append(r"\caption{H3b: Adapted accuracy for LoRA rank $\times$ adaptation data size "
+                 r"(gaussian noise, severity 3, late). Bold = best rank per data size.}")
+    lines.append(r"\label{tab:rank_datasize}")
+    col_spec = "l" + "c" * len(sizes)
+    lines.append(f"\\begin{{tabular}}{{{col_spec}}}")
+    lines.append(r"\toprule")
+    lines.append("Rank $r$ & " +
+                 " & ".join(str(s) for s in sizes) + r" \\")
+    lines.append(r"\midrule")
+
+    best_per_size = {}
+    for s in sizes:
+        col_vals = [pivot.loc[r, s] if s in pivot.columns and r in pivot.index
+                    else np.nan for r in ranks]
+        best_per_size[s] = max((v for v in col_vals if not np.isnan(v)), default=0)
+
+    for r in ranks:
+        row_parts = [str(int(r))]
+        for s in sizes:
+            try:
+                val = pivot.loc[r, s]
+                is_best = abs(val - best_per_size[s]) < 1e-6
+                row_parts.append(bold(val, is_best))
+            except KeyError:
+                row_parts.append("---")
+        lines.append(" & ".join(row_parts) + r" \\")
+
+    lines.append(r"\bottomrule")
+    lines.append(r"\end{tabular}")
+    lines.append(r"\end{table}")
+    save_tex("\n".join(lines), out)
+
+
+
 
 def main(args):
     print("Loading data...")
@@ -347,7 +460,9 @@ def main(args):
     table_method_comparison(df, bench_df, f"{args.out_dir}/table1_method_comparison.tex")
     table_rank_ablation(df, bench_df,     f"{args.out_dir}/table2_rank_ablation.tex")
     table_placement_ablation(df, bench_df,f"{args.out_dir}/table3_placement_ablation.tex")
-    table_per_corruption(df,              f"{args.out_dir}/table4_per_corruption.tex")
+    table_per_corruption(df,               f"{args.out_dir}/table4_per_corruption.tex")
+    table_rank_severity(df,                f"{args.out_dir}/table5_h3_rank_severity.tex")
+    table_rank_datasize(df,                f"{args.out_dir}/table6_h3_rank_datasize.tex")
     print("\n✓ All tables saved.")
 
 

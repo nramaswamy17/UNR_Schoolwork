@@ -10,7 +10,8 @@ Produces:
   figures/fig4_rank_sweep.pdf               — acc + resource vs LoRA rank
   figures/fig5_placement_heatmap.pdf        — placement × corruption heatmap
   figures/fig6_corruption_breakdown.pdf     — per-corruption bar chart
-  figures/fig7_per_class.pdf                — per-class accuracy radar (optional)
+  figures/fig7_rank_x_severity.pdf          — H3a: rank × severity heatmap
+  figures/fig8_rank_x_datasize.pdf          — H3b: rank × data size curves
 
 Usage:
     python analyze.py
@@ -130,7 +131,9 @@ def fig_pareto_params(df, bench_df, out):
     ax.set_xscale("log")
     ax.set_xlabel("Trainable Parameters")
     ax.set_ylabel("Mean Adapted Accuracy")
-    ax.set_title("Accuracy vs. Trainable Parameters (Pareto)")
+    ax.set_title("Accuracy vs. Trainable Parameters (Pareto)\n"
+                 "LoRA rank points show mean across all corruptions × severities\n"
+                 "(not comparable to Table 2, which reports gaussian noise sev3 only)")
     ax.grid(True, alpha=0.3)
     savefig(fig, out)
 
@@ -165,6 +168,9 @@ def fig_pareto_latency(df, bench_df, out):
     ax.set_ylabel("Mean Adapted Accuracy")
     ax.set_title("Accuracy vs. Inference Latency (Pareto)")
     ax.grid(True, alpha=0.3)
+    # Extend x-axis 15% beyond max latency so no point is clipped
+    if not bench_df.empty:
+        ax.set_xlim(0, bench_df["latency_mean_ms"].max() * 1.15)
     savefig(fig, out)
 
 
@@ -175,24 +181,41 @@ def fig_pareto_latency(df, bench_df, out):
 def fig_severity_curves(df, out):
     fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
 
-    for ax, metric, title in zip(
-        axes,
-        ["zero_shot_acc", "best_adapted_acc"],
-        ["Zero-shot (no adaptation)", "After Adaptation"]
-    ):
-        grp = df.groupby(["method", "severity"])[metric].mean().reset_index()
-        for method, color in COLORS.items():
-            sub = grp[grp["method"] == method].sort_values("severity")
-            if sub.empty:
-                continue
-            ax.plot(sub["severity"], sub[metric], marker="o",
-                    color=color, label=METHOD_LABELS[method], linewidth=2)
-        ax.set_xlabel("Corruption Severity")
-        ax.set_ylabel("Accuracy")
-        ax.set_title(title)
-        ax.set_xticks([1, 2, 3, 4, 5])
-        ax.legend(fontsize=9)
-        ax.grid(True, alpha=0.3)
+    # Zero-shot is a property of the frozen baseline + corrupted data, NOT the
+    # adaptation method. Use the method with the most complete corruption ×
+    # severity coverage as the single reference curve to avoid filtering artifacts.
+    coverage = df.groupby("method").apply(
+        lambda g: g.groupby(["corruption", "severity"]).ngroups
+    )
+    ref_method = coverage.idxmax()
+    zero_grp = df[df["method"] == ref_method] \
+                 .groupby("severity")["zero_shot_acc"].mean().reset_index()
+
+    # Left panel — zero-shot (single shared curve)
+    ax0 = axes[0]
+    ax0.plot(zero_grp["severity"], zero_grp["zero_shot_acc"],
+             marker="o", color="black", linewidth=2, label="Baseline (all methods)")
+    ax0.set_xlabel("Corruption Severity")
+    ax0.set_ylabel("Accuracy")
+    ax0.set_title("Zero-shot (no adaptation)")
+    ax0.set_xticks([1, 2, 3, 4, 5])
+    ax0.legend(fontsize=9)
+    ax0.grid(True, alpha=0.3)
+
+    # Right panel — post-adaptation per method
+    ax1 = axes[1]
+    adap_grp = df.groupby(["method", "severity"])["best_adapted_acc"].mean().reset_index()
+    for method, color in COLORS.items():
+        sub = adap_grp[adap_grp["method"] == method].sort_values("severity")
+        if sub.empty:
+            continue
+        ax1.plot(sub["severity"], sub["best_adapted_acc"], marker="o",
+                 color=color, label=METHOD_LABELS[method], linewidth=2)
+    ax1.set_xlabel("Corruption Severity")
+    ax1.set_title("After Adaptation")
+    ax1.set_xticks([1, 2, 3, 4, 5])
+    ax1.legend(fontsize=9)
+    ax1.grid(True, alpha=0.3)
 
     fig.suptitle("Accuracy vs. Corruption Severity", fontsize=13, y=1.02)
     savefig(fig, out)
@@ -257,19 +280,31 @@ def fig_placement_heatmap(df, out):
         return
 
     fig, ax = plt.subplots(figsize=(10, 4))
-    im = ax.imshow(pivot.values, aspect="auto", cmap="RdYlGn", vmin=0.3, vmax=0.9)
+    # Build display array: NaN → unmeasured (hatched), value → colored
+    display = pivot.values.copy()
+    im = ax.imshow(np.where(np.isnan(display), 0, display),
+                   aspect="auto", cmap="RdYlGn", vmin=0.3, vmax=0.9)
     ax.set_xticks(range(len(pivot.columns)))
     ax.set_xticklabels(pivot.columns, rotation=30, ha="right", fontsize=9)
     ax.set_yticks(range(len(pivot.index)))
     ax.set_yticklabels(pivot.index, fontsize=9)
     plt.colorbar(im, ax=ax, label="Adapted Accuracy")
-    ax.set_title("LoRA Placement × Corruption (mean over severities)")
+    ax.set_title("LoRA Placement × Corruption (mean over severities)\n"
+                 "Gray hatch = not measured (placement ablation run on gaussian_noise only)")
 
-    # Annotate cells
     for i in range(pivot.shape[0]):
         for j in range(pivot.shape[1]):
             val = pivot.values[i, j]
-            if not np.isnan(val):
+            if np.isnan(val):
+                # Hatch unmeasured cells with gray so they read as out-of-scope
+                ax.add_patch(plt.Rectangle(
+                    (j - 0.5, i - 0.5), 1, 1,
+                    fill=True, facecolor="#cccccc", edgecolor="white",
+                    hatch="////", linewidth=0
+                ))
+                ax.text(j, i, "N/M", ha="center", va="center",
+                        fontsize=7, color="#555555")
+            else:
                 ax.text(j, i, f"{val:.2f}", ha="center", va="center",
                         fontsize=7, color="black")
     savefig(fig, out)
@@ -304,8 +339,99 @@ def fig_corruption_breakdown(df, out):
 
 
 # ─────────────────────────────────────────────
-# Main
+# Fig 7: H3a — rank × severity heatmap
 # ─────────────────────────────────────────────
+
+def fig_rank_x_severity(df, out):
+    lora_df = df[
+        (df["method"] == "lora") &
+        (df["corruption"] == "gaussian_noise") &
+        (df["placement"] == "late")
+    ].copy()
+
+    if lora_df.empty:
+        print("  [skip fig7] No rank×severity data yet")
+        return
+
+    pivot = lora_df.groupby(["rank", "severity"])["best_adapted_acc"] \
+                   .mean().unstack(fill_value=np.nan)
+    if pivot.empty:
+        print("  [skip fig7] Pivot is empty")
+        return
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    im = ax.imshow(pivot.values, aspect="auto", cmap="RdYlGn", vmin=0.3, vmax=0.9)
+    ax.set_xticks(range(len(pivot.columns)))
+    ax.set_xticklabels([f"Sev {s}" for s in pivot.columns], fontsize=10)
+    ax.set_yticks(range(len(pivot.index)))
+    ax.set_yticklabels([f"r={int(r)}" for r in pivot.index], fontsize=10)
+    plt.colorbar(im, ax=ax, label="Adapted Accuracy")
+    ax.set_title("H3a: LoRA Rank × Corruption Severity\n(gaussian noise, late placement)")
+    ax.set_xlabel("Severity")
+    ax.set_ylabel("LoRA Rank")
+
+    for i in range(pivot.shape[0]):
+        for j in range(pivot.shape[1]):
+            val = pivot.values[i, j]
+            if not np.isnan(val):
+                ax.text(j, i, f"{val:.2f}", ha="center", va="center",
+                        fontsize=8, color="black")
+
+    # Highlight best rank per severity
+    for j in range(pivot.shape[1]):
+        col = pivot.values[:, j]
+        if not np.all(np.isnan(col)):
+            best_i = np.nanargmax(col)
+            ax.add_patch(plt.Rectangle(
+                (j - 0.5, best_i - 0.5), 1, 1,
+                fill=False, edgecolor="black", linewidth=2
+            ))
+    savefig(fig, out)
+
+
+# ─────────────────────────────────────────────
+# Fig 8: H3b — rank × adapt data size
+# ─────────────────────────────────────────────
+
+def fig_rank_x_datasize(df, out):
+    lora_df = df[
+        (df["method"] == "lora") &
+        (df["corruption"] == "gaussian_noise") &
+        (df["severity"] == 3) &
+        (df["placement"] == "late")
+    ].copy()
+
+    # Only rows that have adapt_size variation
+    if "adapt_size" not in lora_df.columns or lora_df["adapt_size"].nunique() < 2:
+        print("  [skip fig8] No rank×datasize data yet")
+        return
+
+    ranks = sorted(lora_df["rank"].dropna().unique())
+    sizes = sorted(lora_df["adapt_size"].dropna().unique())
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    cmap = plt.cm.Blues
+    color_vals = np.linspace(0.4, 1.0, len(ranks))
+
+    for rank, cval in zip(ranks, color_vals):
+        sub = lora_df[lora_df["rank"] == rank].groupby("adapt_size")["best_adapted_acc"] \
+                     .mean().reset_index().sort_values("adapt_size")
+        if sub.empty:
+            continue
+        ax.plot(sub["adapt_size"], sub["best_adapted_acc"],
+                marker="o", label=f"r={int(rank)}",
+                color=cmap(cval), linewidth=2)
+
+    ax.set_xscale("log")
+    ax.set_xlabel("Adaptation Data Size (samples)")
+    ax.set_ylabel("Adapted Accuracy")
+    ax.set_title("H3b: LoRA Rank × Adaptation Data Size\n(gaussian noise, severity 3, late)")
+    ax.legend(title="LoRA Rank", fontsize=9, loc="lower right")
+    ax.grid(True, alpha=0.3)
+    savefig(fig, out)
+
+
+
 
 def main(args):
     print("Loading data...")
@@ -321,6 +447,8 @@ def main(args):
     fig_rank_sweep(df, bench_df,     f"{out}/fig4_rank_sweep.pdf")
     fig_placement_heatmap(df,        f"{out}/fig5_placement_heatmap.pdf")
     fig_corruption_breakdown(df,     f"{out}/fig6_corruption_breakdown.pdf")
+    fig_rank_x_severity(df,          f"{out}/fig7_rank_x_severity.pdf")
+    fig_rank_x_datasize(df,          f"{out}/fig8_rank_x_datasize.pdf")
     print("\n✓ All figures saved.")
 
 

@@ -14,6 +14,8 @@ Usage:
     python sweep.py --phase method           # method comparison only
     python sweep.py --phase rank             # rank ablation only
     python sweep.py --phase placement        # placement ablation only
+    python sweep.py --phase rank_severity    # H3a: rank × severity
+    python sweep.py --phase rank_datasize    # H3b: rank × adapt data size
 """
 
 import argparse
@@ -50,6 +52,7 @@ ALL_SEVERITIES  = [1, 2, 3, 4, 5]
 ALL_METHODS     = ["lora", "head", "bitfit", "full"]
 ALL_RANKS       = [1, 2, 4, 8, 16, 32]
 ALL_PLACEMENTS  = ["early", "late", "all", "head"]
+ALL_ADAPT_SIZES = [50, 100, 250, 500, 1000, 5000]
 
 # Canonical condition for ablations
 CANON_CORRUPTION = "gaussian_noise"
@@ -164,7 +167,41 @@ def build_rank_sweep(smoke=False):
     ]
 
 
-def build_placement_sweep(smoke=False):
+def build_rank_severity_sweep(smoke=False):
+    """H3a: rank × severity on canonical corruption."""
+    ranks      = [4, 8] if smoke else ALL_RANKS
+    severities = [3]    if smoke else ALL_SEVERITIES
+    return [
+        {
+            "method":     "lora",
+            "rank":       r,
+            "placement":  CANON_PLACEMENT,
+            "corruption": CANON_CORRUPTION,
+            "severity":   sev,
+        }
+        for r in ranks
+        for sev in severities
+    ]
+
+
+def build_rank_datasize_sweep(smoke=False):
+    """H3b: rank × adapt data size on canonical condition."""
+    ranks  = [4, 8]           if smoke else ALL_RANKS
+    sizes  = [50, 500, 5000]  if smoke else ALL_ADAPT_SIZES
+    return [
+        {
+            "method":     "lora",
+            "rank":       r,
+            "placement":  CANON_PLACEMENT,
+            "corruption": CANON_CORRUPTION,
+            "severity":   CANON_SEVERITY,
+            "adapt_size": s,   # override shared adapt_size for this phase
+        }
+        for r in ranks
+        for s in sizes
+    ]
+
+
     return [
         {
             "method":     "lora",
@@ -196,7 +233,7 @@ def load_done(out_path: Path):
 
 def _cfg_key(cfg):
     return (cfg['corruption'], cfg['severity'], cfg['method'],
-            cfg.get('rank'), cfg.get('placement'))
+            cfg.get('rank'), cfg.get('placement'), cfg.get('adapt_size'))
 
 
 # ─────────────────────────────────────────────
@@ -216,10 +253,16 @@ def main(args):
         configs = build_rank_sweep(args.smoke)
     elif args.phase == "placement":
         configs = build_placement_sweep(args.smoke)
+    elif args.phase == "rank_severity":
+        configs = build_rank_severity_sweep(args.smoke)
+    elif args.phase == "rank_datasize":
+        configs = build_rank_datasize_sweep(args.smoke)
     else:  # all
         configs  = build_method_sweep(args.smoke)
         configs += build_rank_sweep(args.smoke)
         configs += build_placement_sweep(args.smoke)
+        configs += build_rank_severity_sweep(args.smoke)
+        configs += build_rank_datasize_sweep(args.smoke)
 
     # Fill in shared hyperparams
     shared = dict(
@@ -261,7 +304,8 @@ def main(args):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--phase",   choices=["method","rank","placement","all"],
+    p.add_argument("--phase",   choices=["method","rank","placement",
+                                          "rank_severity","rank_datasize","all"],
                    default="all")
     p.add_argument("--smoke",   action="store_true",
                    help="Quick smoke test: 2 corruptions, sev3, ranks {4,8}")

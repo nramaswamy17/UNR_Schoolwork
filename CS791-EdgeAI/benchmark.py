@@ -232,7 +232,15 @@ def main(args):
             model = prepare_model(baseline, "lora", r, LORA_PLACEMENT).to(device)
             total, trainable = count_params(model)
             label = f"lora_r{r}_{LORA_PLACEMENT}"
-            # skip if already profiled above
+            if not any(res["label"] == label for res in results):
+                results.append(profile_model(label, model, total, trainable))
+            del model; gc.collect()
+
+        print("\nLoRA placement sweep (rank=4):")
+        for placement in ["early", "all", "head"]:  # "late" already done above
+            model = prepare_model(baseline, "lora", LORA_RANKS[2], placement).to(device)
+            total, trainable = count_params(model)
+            label = f"lora_r{LORA_RANKS[2]}_{placement}"
             if not any(res["label"] == label for res in results):
                 results.append(profile_model(label, model, total, trainable))
             del model; gc.collect()
