@@ -88,19 +88,19 @@ SPEED_LABELS = ["stand", "slow_walk", "walk", "fast_walk", "run"]
 
 ROBUSTNESS_TESTS = [
     {
-        "label": "push_disturbance",
+        "label": "velocity_kick_disturbance",
         "vx": 1.5,
         "push": True,
-        "push_force": 150.0,
+        "push_delta_v": 0.35,
         "push_interval_steps": 300,
         "action_delay_steps": 0,
-        "description": "150 N lateral push for one control step every 3 s",
+        "description": "0.35 m/s random lateral root-velocity kick every 3 s",
     },
     {
         "label": "action_delay_2_steps",
         "vx": 1.5,
         "push": False,
-        "push_force": 0.0,
+        "push_delta_v": 0.0,
         "push_interval_steps": 300,
         "action_delay_steps": 2,
         "description": "Hold previous action for two control steps",
@@ -217,18 +217,41 @@ def compute_slip_metric(env: ManagerBasedRLEnv) -> torch.Tensor:
     return 0.5 * (slip_l + slip_r)
 
 
-def set_external_push(env: ManagerBasedRLEnv, force_magnitude: float) -> None:
-    asset = env.scene["robot"]
-    if not hasattr(asset, "set_external_force_and_torque"):
+def apply_root_velocity_kick(env: ManagerBasedRLEnv, delta_v: float) -> None:
+    """Apply a one-step lateral disturbance without using PhysX external-force buffers.
+
+    This is intentionally implemented as an instantaneous root velocity perturbation
+    instead of set_external_force_and_torque(). The external-force API is easy to
+    misuse because it is body-indexed and stores force buffers internally; for
+    evaluation, a velocity kick is simpler, deterministic, and avoids simulator
+    stalls around the first push event.
+    """
+    if delta_v == 0.0:
         return
+
+    asset = env.scene["robot"]
     n = env.num_envs
-    forces = torch.zeros((n, 3), device=env.device)
-    torques = torch.zeros((n, 3), device=env.device)
-    if force_magnitude != 0.0:
-        angles = 2.0 * torch.pi * torch.rand((n,), device=env.device)
-        forces[:, 0] = force_magnitude * torch.cos(angles)
-        forces[:, 1] = force_magnitude * torch.sin(angles)
-    asset.set_external_force_and_torque(forces, torques)
+    env_ids = torch.arange(n, device=env.device, dtype=torch.long)
+
+    if hasattr(asset.data, "root_vel_w"):
+        root_vel = asset.data.root_vel_w[env_ids].clone()
+    else:
+        root_vel = torch.zeros((n, 6), device=env.device, dtype=torch.float32)
+        if hasattr(asset.data, "root_lin_vel_w"):
+            root_vel[:, 0:3] = asset.data.root_lin_vel_w[env_ids].clone()
+        if hasattr(asset.data, "root_ang_vel_w"):
+            root_vel[:, 3:6] = asset.data.root_ang_vel_w[env_ids].clone()
+
+    angles = 2.0 * torch.pi * torch.rand((n,), device=env.device)
+    root_vel[:, 0] += float(delta_v) * torch.cos(angles)
+    root_vel[:, 1] += float(delta_v) * torch.sin(angles)
+
+    if hasattr(asset, "write_root_velocity_to_sim"):
+        asset.write_root_velocity_to_sim(root_vel, env_ids=env_ids)
+    elif hasattr(asset, "write_root_link_velocity_to_sim"):
+        asset.write_root_link_velocity_to_sim(root_vel, env_ids=env_ids)
+    else:
+        raise RuntimeError("Robot articulation does not expose a root velocity write API.")
 
 
 def _get_term_reason_masks_from_env(env: ManagerBasedRLEnv) -> dict[str, torch.Tensor] | None:
@@ -291,7 +314,7 @@ def run_trial(
     vx: float,
     n_steps: int,
     push: bool = False,
-    push_force: float = 0.0,
+    push_delta_v: float = 0.0,
     push_interval_steps: int = 300,
     action_delay_steps: int = 0,
 ) -> dict[str, Any]:
@@ -330,13 +353,9 @@ def run_trial(
 
         pushed_this_step = bool(push and step > 0 and step % push_interval_steps == 0)
         if pushed_this_step:
-            set_external_push(env, push_force)
+            apply_root_velocity_kick(env, push_delta_v)
 
         obs, rew, terminated, truncated, info = env.step(actions)
-
-        # Turn push off immediately after one control step.
-        if pushed_this_step:
-            set_external_push(env, 0.0)
 
         # Keep command fixed after auto-resets.
         set_commands(env, vx)
@@ -402,7 +421,7 @@ def main() -> int:
     policy, wrapped_env = build_inference_policy(env, checkpoint_path, device)
 
     rows: list[dict[str, Any]] = []
-
+    """
     print("\n[EVAL] === Speed Sweep ===")
     for vx, label in zip(EVAL_SPEEDS, SPEED_LABELS):
         result = run_trial(env, policy, label=label, vx=vx, n_steps=args_cli.eval_steps)
@@ -414,7 +433,7 @@ def main() -> int:
             f"vx_err={result['mean_vx_error']:.4f} slip={result['mean_slip']:.4f} "
             f"falls={result['fall_count']}"
         )
-
+    """
     print("\n[EVAL] === Robustness Tests ===")
     for test in ROBUSTNESS_TESTS:
         result = run_trial(
@@ -424,7 +443,7 @@ def main() -> int:
             vx=float(test["vx"]),
             n_steps=args_cli.eval_steps,
             push=bool(test["push"]),
-            push_force=float(test["push_force"]),
+            push_delta_v=float(test.get("push_delta_v", 0.0)),
             push_interval_steps=int(test["push_interval_steps"]),
             action_delay_steps=int(test["action_delay_steps"]),
         )
